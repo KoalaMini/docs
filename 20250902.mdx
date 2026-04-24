@@ -1,0 +1,131 @@
+---
+title: "20250902 高级搜索竞品调研"
+---
+
+# 1. 条件编排
+
+## 1.1 ES工具类（Kibana）
+
+<Frame>
+  <img
+    src="/images/image.png"
+    alt="Image"
+    title="Image"
+    className="mx-auto"
+  />
+</Frame>
+
+```json
+// 对于的检索式
+{
+  "bool": {
+    "must": [],
+    "filter": [
+      {
+        "bool": {
+          "should": [
+            {
+              "bool": {
+                "must": [],
+                "filter": [
+                  {
+                    "bool": {
+                      "minimum_should_match": 1,
+                      "should": [
+                        {
+                          "match_phrase": {
+                            "abs": "人工智能"
+                          }
+                        },
+                        {
+                          "match_phrase": {
+                            "abs": "大语言模型"
+                          }
+                        },
+                        {
+                          "match_phrase": {
+                            "abs": "大模型"
+                          }
+                        },
+                        {
+                          "match_phrase": {
+                            "abs": "生成"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "should": [],
+                "must_not": []
+              }
+            },
+            {
+              "bool": {
+                "must": [],
+                "filter": [
+                  {
+                    "bool": {
+                      "minimum_should_match": 1,
+                      "should": [
+                        {
+                          "match_phrase": {
+                            "standard_title": "人工智能"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "should": [],
+                "must_not": []
+              }
+            }
+          ],
+          "minimum_should_match": 1
+        }
+      },
+      {
+        "bool": {
+          "minimum_should_match": 1,
+          "should": [
+            {
+              "match_phrase": {
+                "pubDept_Name": "国务院"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "bool": {
+          "minimum_should_match": 1,
+          "should": [
+            {
+              "match_phrase": {
+                "abs": "生成式"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "should": [],
+    "must_not": []
+  }
+}
+```
+
+<Frame>
+  ![Image](/images/image-1.png)
+</Frame>
+
+### 1.2 多维表格类
+
+<Frame>
+  ![Image](/images/image-3.png)
+</Frame>
+
+<Frame>
+  ![Image](/images/image-4.png)
+</Frame>
