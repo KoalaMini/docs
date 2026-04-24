@@ -17,16 +17,6 @@
           "href": "https://mintlify.com/docs"
         },
         {
-          "anchor": "Documentation",
-          "icon": "book-open-cover",
-          "href": "https://mintlify.com/docs"
-        },
-        {
-          "anchor": "Blog",
-          "icon": "newspaper",
-          "href": "https://mintlify.com/blog"
-        },
-        {
           "anchor": "Blog",
           "icon": "newspaper",
           "href": "https://mintlify.com/blog"
@@ -34,6 +24,18 @@
       ]
     },
     "tabs": [
+      {
+        "tab": "作品介绍",
+        "pages": [
+          {
+            "group": "ES高级搜索",
+            "pages": [
+              "es",
+              "20250902"
+            ]
+          }
+        ]
+      },
       {
         "tab": "Guides",
         "groups": [
@@ -87,18 +89,6 @@
               "api-reference/endpoint/create",
               "api-reference/endpoint/delete",
               "api-reference/endpoint/webhook"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "作品介绍",
-        "pages": [
-          {
-            "group": "ES高级搜索",
-            "pages": [
-              "es",
-              "20250902"
             ]
           }
         ]
