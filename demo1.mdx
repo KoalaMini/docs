@@ -1,0 +1,209 @@
+---
+title: "ES高级搜索交互方案"
+sidebarTitle: "ES高级搜索"
+---
+
+# 1. 交互方案选型
+
+**目标用户：** 新兴产业研究员
+
+**用户特点：** 擅长查找资料，熟练掌握检索技能，能接受一定复杂度的界面交互，飞书等协同办公软件使用较多，对于自由度过高的编写式交互接受程度低
+
+**用户分级：** 偏中级用户
+
+**竞品调研方向：**
+
+- ES本身的工具，偏技术向
+- 多维表格等工具，偏办公向
+- 垂类检索工具，比如政策、专利、企业等
+
+**竞品调研内容：**
+
+- 比较不同竞品的”条件编排“的交互体验
+- 比较不同竞品的“筛选操作符”约束，考虑交互细节
+
+## 1.1 竞品调研：条件编排
+
+### 1.1.1 ES工具类
+
+<Frame caption="kibana">
+  <img
+    src="/images/image.png"
+    alt="Image"
+    title="Image"
+    className="mx-auto"
+  />
+</Frame>
+
+```json
+// 对于的检索式
+{
+  "bool": {
+    "must": [],
+    "filter": [
+      {
+        "bool": {
+          "should": [
+            {
+              "bool": {
+                "must": [],
+                "filter": [
+                  {
+                    "bool": {
+                      "minimum_should_match": 1,
+                      "should": [
+                        {
+                          "match_phrase": {
+                            "abs": "人工智能"
+                          }
+                        },
+                        {
+                          "match_phrase": {
+                            "abs": "大语言模型"
+                          }
+                        },
+                        {
+                          "match_phrase": {
+                            "abs": "大模型"
+                          }
+                        },
+                        {
+                          "match_phrase": {
+                            "abs": "生成"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "should": [],
+                "must_not": []
+              }
+            },
+            {
+              "bool": {
+                "must": [],
+                "filter": [
+                  {
+                    "bool": {
+                      "minimum_should_match": 1,
+                      "should": [
+                        {
+                          "match_phrase": {
+                            "standard_title": "人工智能"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "should": [],
+                "must_not": []
+              }
+            }
+          ],
+          "minimum_should_match": 1
+        }
+      },
+      {
+        "bool": {
+          "minimum_should_match": 1,
+          "should": [
+            {
+              "match_phrase": {
+                "pubDept_Name": "国务院"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "bool": {
+          "minimum_should_match": 1,
+          "should": [
+            {
+              "match_phrase": {
+                "abs": "生成式"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "should": [],
+    "must_not": []
+  }
+}
+```
+
+<Frame>
+  ![Image](/images/image-1.png)
+</Frame>
+
+### 1.1.2 多维表格类
+
+<Frame caption="airtable">
+  ![Image](/images/image-3.png)
+</Frame>
+
+<Frame caption="notion的database">
+  ![Image](/images/image-4.png)
+</Frame>
+
+<Frame>
+  ![Image](/images/image-5.png)
+</Frame>
+
+<Frame caption="飞书多维表格">
+  ![Image](/images/image-6.png)
+</Frame>
+
+### 1.1.3 垂类搜索产品
+
+<Frame caption="国家法律法规库 https://flk.npc.gov.cn/advanceSearch">
+  ![Image](/images/image-7.png)
+</Frame>
+
+<Frame caption="佰腾专利 https://www.baiten.cn/gjs.html">
+  ![Pix Pin 2026 04 24 17 35 54](/images/PixPin_2026-04-24_17-35-54.png)
+</Frame>
+
+### 1.1.4 其他
+
+<Frame>
+  ![Image](/images/image-8.png)
+</Frame>
+
+## 1.2 竞品调研：筛选操作符
+
+| 字段类型 | 操作符 |
+| --- | --- |
+| 文本 | <ul><li>是</li><li>不是</li><li>包含</li><li>不包含</li><li>开头是</li><li>结尾是</li><li>为空白</li><li>不为空白</li></ul> |
+| 多选枚举 | <ul><li>包含</li><li>不包含</li><li>为空白</li><li>不为空白</li></ul> |
+| 单选枚举 | <ul><li>是</li><li>不是</li><li>为空白</li><li>不为空白</li></ul> |
+| 数值 | <ul><li>=</li><li>≠</li><li>\></li><li>≥</li><li>\<</li><li>≤</li><li>为空白</li><li>不为空白</li></ul> |
+| 日期 | <ul><li>是</li><li>早于</li><li>晚于</li><li>不早于</li><li>不晚于</li><li>介于</li><li>相对于今天</li><li>为空白</li><li>不为空白</li></ul> |
+
+## 1.3 方案结果
+
+<Frame caption="https://demo1.bicola.me">
+  ![Pix Pin 2026 04 24 17 16 22](/images/PixPin_2026-04-24_17-16-22.png)
+</Frame>
+
+# 2. 技术限制下的交互设计
+
+**问题背景**
+
+针对“招投标”这些复杂查询场景，对招标单位、中标单位有一些限定，比如“上市的民营企业”，数据库设计采用 nested 结构存储，这种技术背景下，继续采用扁平字段来编排条件已无法预期结果。
+
+如何保证在 nested 这种嵌套结构的结束背景下，实现用户编排的条件用于检索的结果是符合预期的？
+
+**解决思路**
+
+参考“装饰器”设计模式，引入“输入助手”来辅助输入引导，保证生成的检索式是符合预期的
+
+**方案结果**
+
+<Frame>
+  ![Pix Pin 2026 04 24 17 18 23](/images/PixPin_2026-04-24_17-18-23.png)
+</Frame>
