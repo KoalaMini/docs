@@ -9,92 +9,87 @@
   },
   "favicon": "/favicon.svg",
   "navigation": {
-    "dropdowns": [
+    "tabs": [
       {
-        "dropdown": "Untitled Dropdown",
-        "anchors": [
-          {
-            "anchor": "mintlify示例",
-            "global": {
-              "anchors": [
-                {
-                  "anchor": "Blog",
-                  "icon": "newspaper",
-                  "href": "https://mintlify.com/blog"
-                },
-                {
-                  "anchor": "Documentation",
-                  "icon": "book-open-cover",
-                  "href": "https://mintlify.com/docs"
-                }
-              ]
+        "tab": "mintlify示例",
+        "global": {
+          "anchors": [
+            {
+              "anchor": "Blog",
+              "icon": "newspaper",
+              "href": "https://mintlify.com/blog"
             },
-            "tabs": [
+            {
+              "anchor": "Documentation",
+              "icon": "book-open-cover",
+              "href": "https://mintlify.com/docs"
+            }
+          ]
+        },
+        "menu": [
+          {
+            "item": "Guides",
+            "groups": [
               {
-                "tab": "Guides",
-                "groups": [
-                  {
-                    "group": "Getting started",
-                    "pages": [
-                      "index",
-                      "quickstart",
-                      "development"
-                    ]
-                  },
-                  {
-                    "group": "Customization",
-                    "pages": [
-                      "essentials/settings",
-                      "essentials/navigation"
-                    ]
-                  },
-                  {
-                    "group": "Writing content",
-                    "pages": [
-                      "essentials/markdown",
-                      "essentials/code",
-                      "essentials/images",
-                      "essentials/reusable-snippets"
-                    ]
-                  },
-                  {
-                    "group": "AI tools",
-                    "pages": [
-                      "ai-tools/cursor",
-                      "ai-tools/claude-code",
-                      "ai-tools/windsurf"
-                    ]
-                  }
-                ]
-              },
-              {
-                "tab": "API reference",
-                "groups": [
-                  {
-                    "group": "API documentation",
-                    "pages": [
-                      "api-reference/introduction"
-                    ]
-                  },
-                  {
-                    "group": "Endpoint examples",
-                    "pages": [
-                      "api-reference/endpoint/get",
-                      "api-reference/endpoint/create",
-                      "api-reference/endpoint/delete",
-                      "api-reference/endpoint/webhook"
-                    ]
-                  }
-                ]
-              },
-              {
-                "tab": "作品介绍",
+                "group": "Getting started",
                 "pages": [
-                  "demo1"
+                  "index",
+                  "quickstart",
+                  "development"
+                ]
+              },
+              {
+                "group": "Customization",
+                "pages": [
+                  "essentials/settings",
+                  "essentials/navigation"
+                ]
+              },
+              {
+                "group": "Writing content",
+                "pages": [
+                  "essentials/markdown",
+                  "essentials/code",
+                  "essentials/images",
+                  "essentials/reusable-snippets"
+                ]
+              },
+              {
+                "group": "AI tools",
+                "pages": [
+                  "ai-tools/cursor",
+                  "ai-tools/claude-code",
+                  "ai-tools/windsurf"
+                ]
+              }
+            ]
+          },
+          {
+            "item": "API Reference",
+            "groups":[
+              {
+                "group": "API documentation",
+                "pages": [
+                  "api-reference/introduction"
+                ]
+              },
+              {
+                "group": "Endpoint examples",
+                "pages": [
+                  "api-reference/endpoint/get",
+                  "api-reference/endpoint/create",
+                  "api-reference/endpoint/delete",
+                  "api-reference/endpoint/webhook"
                 ]
               }
             ]
           }
+        ]
+      },
+      {
+        "tab": "作品介绍",
+        "pages": [
+          "demo1"
         ]
       }
     ]
@@ -114,15 +109,15 @@
   },
   "contextual": {
     "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode"
+    ]
   },
   "footer": {
     "socials": {
