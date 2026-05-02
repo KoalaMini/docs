@@ -91,6 +91,19 @@
         "pages": [
           "demo1"
         ]
+      },
+      {
+        "tab": "程序猿",
+        "menu": [
+          {
+            "item": "Linux",
+            "pages": [
+              "linux/commands",
+              "linux/ssh",
+              "linux/vim"
+            ]
+          }
+        ]
       }
     ]
   },

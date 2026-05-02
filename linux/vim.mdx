@@ -1,0 +1,249 @@
+---
+title: "Vim 编辑器"
+sidebarTitle: "Vim"
+description: "vi improved 编辑器常用操作速查：模式、移动、编辑、搜索替换、可视化"
+---
+
+<Note>
+  **vim** = **vi im**proved，源自 Bill Joy 1976 年开发的 **vi** (**vi**sual editor)。
+  Vim 是模式编辑器，与多数所见即所得编辑器最大的区别在于「按键 = 命令」。
+</Note>
+
+# 1. 三大模式
+
+```
+                插入模式 (Insert)
+                       ↑ i / a / o
+                       ↓ Esc
+普通模式 (Normal)  ←→  可视模式 (Visual)
+                       ↑ v / V / Ctrl+v
+                       ↓ Esc
+                命令行模式 (Command-line)
+                       ↑ : / / / ?
+```
+
+| 模式 | 用途 | 进入方式 | 退出方式 |
+| --- | --- | --- | --- |
+| 普通 (Normal) | 移动、删除、复制等 | 启动默认 / `Esc` | - |
+| 插入 (Insert) | 输入文本 | `i` `a` `o` `I` `A` `O` 等 | `Esc` |
+| 可视 (Visual) | 选区操作 | `v` `V` `Ctrl+v` | `Esc` |
+| 命令行 (Command-line) | 保存、退出、查找、替换 | `:` `/` `?` | `Esc` / 回车执行 |
+
+<Tip>
+  初学者最常见的困惑：「我打字怎么变成奇怪的命令？」——因为还在普通模式。先按 `i` 进入插入模式再输入。
+</Tip>
+
+# 2. 进入插入模式
+
+| 命令 | 行为 |
+| --- | --- |
+| `i` | insert，光标当前位置前插入 |
+| `I` | 跳到行首并插入 |
+| `a` | append，光标当前位置后插入 |
+| `A` | 跳到行尾并追加 |
+| `o` | open，下方新开一行 |
+| `O` | 上方新开一行 |
+| `s` | substitute，删除当前字符并插入 |
+| `S` | 删除整行并插入 |
+
+# 3. 移动（Motion）
+
+<AccordionGroup>
+  <Accordion title="字符与行内">
+    | 命令 | 含义 |
+    | --- | --- |
+    | `h` `j` `k` `l` | 左 / 下 / 上 / 右 |
+    | `0` | 跳到行首（列 0） |
+    | `^` | 跳到行首第一个非空字符 |
+    | `$` | 跳到行尾 |
+    | `f<c>` | find，跳到本行下一个字符 `c` |
+    | `F<c>` | 反向 find |
+    | `t<c>` | till，跳到字符 `c` 的前一个位置 |
+    | `;` `,` | 重复 `f`/`t` 正向 / 反向 |
+  </Accordion>
+
+  <Accordion title="单词级">
+    | 命令 | 全称 / 含义 |
+    | --- | --- |
+    | `w` | word，下一个单词开头 |
+    | `b` | back，上一个单词开头 |
+    | `e` | end，下一个单词结尾 |
+    | `W` `B` `E` | 同上，但以空格分隔 |
+  </Accordion>
+
+  <Accordion title="文档级">
+    | 命令 | 含义 |
+    | --- | --- |
+    | `gg` | 跳到文件第一行 |
+    | `G` | 跳到文件最后一行 |
+    | `<n>G` 或 `:<n>` | 跳到第 n 行（如 `42G`） |
+    | `Ctrl+u` | up，向上翻半页 |
+    | `Ctrl+d` | down，向下翻半页 |
+    | `Ctrl+b` | back，向上翻一整页 |
+    | `Ctrl+f` | forward，向下翻一整页 |
+    | `H` `M` `L` | high / middle / low，跳到屏幕顶/中/底 |
+    | `%` | 在配对的 `{}` `()` `[]` 间跳转 |
+  </Accordion>
+</AccordionGroup>
+
+# 4. 编辑
+
+<AccordionGroup>
+  <Accordion title="删除（delete / cut，进入寄存器）">
+    ```text
+    x        # 删当前字符
+    X        # 删光标前一个字符
+    dd       # delete line，删整行
+    D        # 从光标删到行尾（等于 d$）
+    dw       # 删一个 word
+    d<motion># 配合 motion，如 d$、dG、d3w
+    ```
+
+    <Tip>
+      删除在 vim 中等同剪切——内容会进入默认寄存器，可用 `p` 粘贴。
+    </Tip>
+  </Accordion>
+
+  <Accordion title="复制（yank）">
+    ```text
+    yy       # yank line，复制整行
+    Y        # 同 yy
+    yw       # 复制一个 word
+    y$       # 复制到行尾
+    p        # paste，光标后粘贴
+    P        # 光标前粘贴
+    ```
+  </Accordion>
+
+  <Accordion title="修改（change，删除并进入插入）">
+    ```text
+    cc       # change line，整行替换
+    cw       # 替换一个 word
+    c$       # 从光标改到行尾
+    C        # 同 c$
+    r<c>     # replace，替换单个字符为 c
+    R        # 进入替换模式（Replace）
+    ```
+  </Accordion>
+
+  <Accordion title="撤销与重做">
+    | 命令 | 全称 / 含义 |
+    | --- | --- |
+    | `u` | undo，撤销 |
+    | `U` | 撤销整行所有改动 |
+    | `Ctrl+r` | redo，重做 |
+    | `.` | 重复上一次编辑命令 |
+  </Accordion>
+</AccordionGroup>
+
+<Tip>
+  Vim 的强大之处在于 **operator + motion** 组合：`d3w` 删 3 个 word、`y$` 复制到行尾、`c2j` 修改下两行……自由组合即「Vim 语言」。
+</Tip>
+
+# 5. 搜索与替换
+
+<AccordionGroup>
+  <Accordion title="搜索">
+    ```text
+    /pattern   # 向下搜索
+    ?pattern   # 向上搜索
+    n          # next，重复上次搜索方向
+    N          # 反向重复
+    *          # 搜索光标下单词（向下）
+    #          # 搜索光标下单词（向上）
+    ```
+  </Accordion>
+
+  <Accordion title="替换（substitute）">
+    使用命令行模式下的 `:s` 命令。
+
+    ```text
+    :s/old/new/         # 当前行第一个 old → new
+    :s/old/new/g        # 当前行所有 old（g = global）
+    :%s/old/new/g       # 整个文件所有（% = 整个文件）
+    :%s/old/new/gc      # c = confirm，每次替换确认
+    :%s/old/new/gi      # i = ignore case
+    :5,20s/old/new/g    # 仅在 5-20 行替换
+    ```
+
+    **替换中的特殊字符**
+
+    | 符号 | 含义 |
+    | --- | --- |
+    | `&` | 整个匹配 |
+    | `\1` `\2` | 捕获组（需配合 `\(...\)`） |
+    | `\n` | 换行 |
+  </Accordion>
+</AccordionGroup>
+
+# 6. 可视模式（Visual）
+
+| 命令 | 含义 |
+| --- | --- |
+| `v` | 字符级可视选择 |
+| `V` | 行级可视选择 |
+| `Ctrl+v` | 块级可视选择（列编辑利器） |
+| `o` | 在选区两端切换光标 |
+| `gv` | 重新选择上次选区 |
+
+进入可视模式后选中区域，再按 `d`、`y`、`c`、`>`、`<`、`=` 等执行对应操作。
+
+# 7. 文件与窗口
+
+<AccordionGroup>
+  <Accordion title="保存与退出（命令行模式）">
+    ```text
+    :w             # write，保存
+    :w newname     # 另存为
+    :q             # quit，退出
+    :wq    或  :x  # 保存并退出
+    :q!            # 强制退出，丢弃修改
+    ZZ             # 普通模式快捷：保存并退出
+    ZQ             # 普通模式快捷：不保存退出
+    ```
+  </Accordion>
+
+  <Accordion title="多文件">
+    ```text
+    :e file        # edit，打开文件
+    :ls   或 :buffers   # 列出 buffer
+    :b<n>          # 切换到第 n 个 buffer
+    :bn   :bp      # next / previous buffer
+    :bd            # buffer delete，关闭
+    ```
+  </Accordion>
+
+  <Accordion title="窗口分屏">
+    ```text
+    :sp file       # split，水平分屏
+    :vsp file      # vertical split，垂直分屏
+    Ctrl+w h/j/k/l # 在窗口间移动
+    Ctrl+w w       # 循环切换
+    Ctrl+w q       # 关闭当前窗口
+    Ctrl+w =       # 平均窗口大小
+    ```
+  </Accordion>
+</AccordionGroup>
+
+# 8. 速查表
+
+<CardGroup cols={2}>
+  <Card title="活下来 (Survival)">
+    1. `Esc` 回到普通模式
+    2. `i` 进入插入模式开始打字
+    3. `:wq` 保存退出
+    4. `:q!` 不保存退出
+    5. `u` 撤销
+  </Card>
+  <Card title="提效 (Productivity)">
+    - `dd` `yy` `p` 行级剪切复制粘贴
+    - `gg=G` 自动缩进整个文件
+    - `.` 重复上次编辑
+    - `Ctrl+v` 块编辑：批量加注释 / 对齐
+    - `:%s/old/new/gc` 全局替换并确认
+  </Card>
+</CardGroup>
+
+<Tip>
+  系统自带交互式入门教程：终端运行 `vimtutor` 即可，约 30 分钟覆盖核心操作。
+</Tip>

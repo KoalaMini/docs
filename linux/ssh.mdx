@@ -1,0 +1,189 @@
+---
+title: "SSH 远程访问与文件传输"
+sidebarTitle: "SSH"
+description: "ssh / scp / rsync 命令详解，包含密钥配置、端口转发、配置文件等"
+---
+
+<Note>
+  **ssh** = **S**ecure **Sh**ell，安全外壳协议，用于在不安全网络上加密远程登录与命令执行；标准端口 22。
+</Note>
+
+# 1. ssh — 远程登录
+
+<AccordionGroup>
+  <Accordion title="基本登录">
+    ```bash
+    ssh user@host                          # 用密码登录远程主机
+    ssh user@host -p 2222                  # -p = --port，指定端口（默认 22）
+    ssh -i ~/.ssh/id_rsa user@host         # -i = --identity_file，使用指定私钥
+    ssh -v user@host                       # -v = --verbose，调试输出（-vv / -vvv 更详细）
+    ssh user@host "ls -lh /tmp"            # 直接执行远程命令后退出
+    ```
+  </Accordion>
+
+  <Accordion title="密钥对生成与下发">
+    ```bash
+    ssh-keygen -t ed25519 -C "you@email"   # -t = --type 算法; -C = --comment 注释
+    ssh-keygen -t rsa -b 4096              # -b = --bits 长度（RSA 推荐 ≥ 4096）
+    ssh-copy-id user@host                  # 把本地公钥安装到远程 ~/.ssh/authorized_keys
+    ssh-copy-id -i ~/.ssh/id_rsa.pub user@host -p 2222
+    ```
+
+    **密钥相关文件**
+
+    | 文件 | 说明 |
+    | --- | --- |
+    | `~/.ssh/id_ed25519` / `id_rsa` | 私钥（不外传） |
+    | `~/.ssh/id_ed25519.pub` / `id_rsa.pub` | 公钥（可下发） |
+    | `~/.ssh/authorized_keys` | 服务端：受信任的公钥列表 |
+    | `~/.ssh/known_hosts` | 客户端：已确认过的主机指纹 |
+    | `~/.ssh/config` | 客户端配置文件 |
+  </Accordion>
+
+  <Accordion title="ssh-agent — 私钥代理">
+    ```bash
+    eval "$(ssh-agent -s)"                 # 启动 agent
+    ssh-add ~/.ssh/id_ed25519              # 把私钥加入 agent（避免重复输入密码）
+    ssh-add -l                             # -l = --list，列出已加载的密钥
+    ssh-add -D                             # -D = --delete-all，移除全部密钥
+    ```
+  </Accordion>
+
+  <Accordion title="~/.ssh/config — 客户端配置文件">
+    简化常用主机的连接命令，免去每次输入用户/端口/密钥。
+
+    ```text
+    # ~/.ssh/config
+    Host myserver
+        HostName 192.168.1.100
+        User alice
+        Port 2222
+        IdentityFile ~/.ssh/id_ed25519
+
+    Host *.bicola.me
+        User deploy
+        ForwardAgent yes
+    ```
+
+    配置后即可：
+
+    ```bash
+    ssh myserver                           # 等价于 ssh -p 2222 -i ~/.ssh/id_ed25519 alice@192.168.1.100
+    ```
+  </Accordion>
+</AccordionGroup>
+
+# 2. 端口转发（隧道）
+
+<AccordionGroup>
+  <Accordion title="-L 本地转发（Local forwarding）">
+    把本地端口流量通过 ssh 转发到远端可达的目标。常用于访问内网服务。
+
+    ```bash
+    ssh -L 8080:internal-db:3306 user@gateway
+    # 访问本机 localhost:8080 等同访问 gateway 视角下的 internal-db:3306
+    ```
+  </Accordion>
+
+  <Accordion title="-R 远程转发（Remote forwarding）">
+    把远端端口流量转发回本地。常用于把内网服务暴露给远端。
+
+    ```bash
+    ssh -R 9000:localhost:3000 user@public-host
+    # 访问 public-host:9000 等同访问发起方 localhost:3000
+    ```
+  </Accordion>
+
+  <Accordion title="-D 动态转发（Dynamic SOCKS proxy）">
+    在本地启动一个 SOCKS5 代理，所有流量经 ssh 隧道走出。
+
+    ```bash
+    ssh -D 1080 user@gateway
+    # 浏览器或 curl 设置 SOCKS5 代理为 127.0.0.1:1080 即可
+    curl --socks5 127.0.0.1:1080 https://example.com
+    ```
+  </Accordion>
+
+  <Accordion title="-N / -f — 仅做隧道、放后台">
+    ```bash
+    ssh -fNL 8080:internal-db:3306 user@gateway
+    # -f = 后台运行（fork）
+    # -N = 不执行远程命令（仅做端口转发）
+    ```
+  </Accordion>
+</AccordionGroup>
+
+# 3. scp — 文件传输
+
+<Note>
+  **scp** = **S**ecure **C**o**p**y，基于 ssh 的文件传输；语法类似 `cp`，但路径可加 `user@host:`。
+</Note>
+
+```bash
+scp file.txt user@host:/tmp/                # 上传单个文件
+scp user@host:/tmp/file.txt ./              # 下载单个文件
+scp -r dir user@host:/tmp/                  # -r = --recursive，递归传输目录
+scp -P 2222 file user@host:/tmp/            # -P = port（注意大写，与 ssh 的 -p 不同）
+scp -i ~/.ssh/key file user@host:/tmp/      # -i 使用指定私钥
+scp -p file user@host:/tmp/                 # -p 保留时间戳和权限（preserve）
+scp -C file user@host:/tmp/                 # -C 启用压缩（compression）
+```
+
+<Warning>
+  scp 在新版 OpenSSH 中已被视为遗留协议，传大量文件或目录建议改用 `rsync` 或 `sftp`。
+</Warning>
+
+# 4. rsync — 增量同步
+
+<Note>
+  **rsync** = **r**emote **sync**，差量同步算法只传输变化部分，适合大文件、目录、备份。
+</Note>
+
+<AccordionGroup>
+  <Accordion title="基本用法">
+    ```bash
+    rsync -avz src/ user@host:/dst/                   # 推送目录到远程
+    rsync -avz user@host:/src/ ./dst/                 # 从远程拉取
+    rsync -avz --delete src/ user@host:/dst/          # 同步并删除目标多余文件
+    rsync -avzP big.iso user@host:/tmp/               # -P = --partial --progress
+    rsync -avz -e "ssh -p 2222" src/ user@host:/dst/  # -e = remote shell，自定义 ssh 命令
+    rsync -avz --exclude='*.log' src/ dst/            # 排除特定模式
+    ```
+  </Accordion>
+
+  <Accordion title="常用参数全称">
+    | 参数 | 全称 | 含义 |
+    | --- | --- | --- |
+    | `-a` | `--archive` | 归档模式（等价 `-rlptgoD`） |
+    | `-v` | `--verbose` | 详细输出 |
+    | `-z` | `--compress` | 传输时压缩 |
+    | `-r` | `--recursive` | 递归 |
+    | `-l` | `--links` | 保留软链接 |
+    | `-p` | `--perms` | 保留权限 |
+    | `-t` | `--times` | 保留时间戳 |
+    | `-P` | `--partial --progress` | 断点续传 + 进度 |
+    | `-n` | `--dry-run` | 仅模拟、不实际操作 |
+    | - | `--delete` | 删除目标端多余文件 |
+    | - | `--exclude` | 排除模式 |
+
+    <Tip>
+      源路径末尾带 `/` 表示「目录的内容」，不带 `/` 表示「目录本身」——这是 rsync 最易踩的坑。
+    </Tip>
+  </Accordion>
+</AccordionGroup>
+
+# 5. 排错小贴士
+
+<CardGroup cols={2}>
+  <Card title="连接失败">
+    - `ssh -v user@host` 看协商过程
+    - 检查防火墙 / 端口
+    - 确认服务端 sshd 在监听：`ss -tnlp | grep :22`
+    - 公钥免密失败先看 `~/.ssh` 权限：目录 `700`，私钥 `600`
+  </Card>
+  <Card title="主机指纹变更">
+    - 报 `REMOTE HOST IDENTIFICATION HAS CHANGED!` 时
+    - 用 `ssh-keygen -R host` 移除旧指纹
+    - 再次连接确认新指纹
+  </Card>
+</CardGroup>
