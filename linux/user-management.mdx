@@ -1,0 +1,224 @@
+---
+title: "Linux 用户管理"
+sidebarTitle: "用户管理"
+description: "用户账号、sudo 提权、环境变量 —— 部署中关于「身份」的所有事"
+---
+
+<Note>
+  本页覆盖部署中和"身份"相关的命令：建账号、改密码、加入 sudo 组、用 sudo 提权、配置环境变量。生产环境绝大多数操作都不该用 root，理解这一组命令是基础。
+</Note>
+
+# 1. 用户账号管理
+
+<AccordionGroup>
+  <Accordion title="useradd / userdel / passwd / usermod — 增删改用户">
+    ```bash
+    # 创建用户
+    sudo useradd -m -s /bin/bash alice
+    # -m = --create-home，建家目录 /home/alice
+    # -s = --shell，指定登录 shell
+
+    # 设密码
+    sudo passwd alice            # passwd = password
+    # 然后按提示输入两次密码
+
+    # 修改用户：加入 sudo 组
+    sudo usermod -aG sudo alice
+    # -a = --append，追加（不要漏！否则会替换掉原有组）
+    # -G = --groups，指定要加入的组
+
+    # 删除用户
+    sudo userdel -r alice        # -r = --remove，连同家目录一起删
+
+    # 查看用户所属组
+    groups alice
+    id alice                     # 更详细：UID / GID / 所有 group
+    ```
+  </Accordion>
+
+  <Accordion title="who am I（自我确认）">
+    ```bash
+    whoami                       # 我是哪个用户
+    id                           # 我的 UID / GID / 所属组
+    groups                       # 我属于哪些组
+    echo $HOME                   # 我的家目录在哪
+    ```
+
+    **场景**：sudo 切换后、ssh 不同账户登入后，先确认身份再操作，避免改错文件归属。
+  </Accordion>
+
+  <Accordion title="用户、UID 与 /etc/passwd">
+    每个用户在 `/etc/passwd` 里一行，字段以 `:` 分隔：
+
+    ```text
+    alice:x:1001:1001:Alice Wang:/home/alice:/bin/bash
+    │     │ │    │    │          │           │
+    用户名 │ UID  GID  备注       家目录       登录 shell
+           密码占位（实际密码在 /etc/shadow）
+    ```
+
+    | 关键字段 | 说明 |
+    | --- | --- |
+    | UID | 用户 ID。`0` 是 root；`< 1000` 一般是系统账户；`>= 1000` 是普通用户 |
+    | GID | 主组 ID（对应 `/etc/group`） |
+    | 登录 shell | 设为 `/usr/sbin/nologin` 即「能存在但不能登录」，常用于服务账户 |
+
+    **不需要登录的服务账户**：
+
+    ```bash
+    sudo useradd -r -s /usr/sbin/nologin myapp
+    # -r = --system，创建系统账户（UID 通常 < 1000）
+    # 然后让 myapp.service 用 User=myapp 运行
+    ```
+  </Accordion>
+</AccordionGroup>
+
+# 2. sudo / su — 提权
+
+<AccordionGroup>
+  <Accordion title="sudo (superuser do) — 单条命令提权（推荐）">
+    ```bash
+    sudo command                 # ⭐ 用 root 身份执行单条命令
+    sudo -i                      # -i = --login，进入 root 交互 shell
+    sudo -u alice command        # -u = --user，以 alice 身份执行
+    sudo -k                      # -k = --kill，清除已缓存的 sudo 凭证
+    sudo !!                      # 上一条命令前加 sudo（漏写时神器）
+    ```
+
+    **为什么推荐 `sudo` 而不是直接登 root：**
+
+    | 维度 | sudo | root 登录 |
+    | --- | --- | --- |
+    | 审计 | `/var/log/auth.log` 留下完整操作记录 | 几乎无追溯 |
+    | 误操作风险 | 每次都要敲 sudo，多一道意识 | 随时一发不可收拾 |
+    | 权限粒度 | `/etc/sudoers` 可精细配置（哪个用户能执行哪些命令） | 全开 |
+  </Accordion>
+
+  <Accordion title="su (substitute user) — 切换身份">
+    ```bash
+    su - alice                   # 切换到 alice，- 表示加载其登录环境
+    su -                         # 切换到 root（- 表示完整登录环境）
+    su alice                     # 仅切用户，环境变量保留当前的（不推荐）
+    exit                         # 从切换出来的身份退出
+    ```
+
+    <Note>
+      新系统通常默认禁用 root 直接 `su -`（root 密码未设），用 `sudo -i` 替代。
+    </Note>
+  </Accordion>
+
+  <Accordion title="配置 sudoers（进阶了解）">
+    `/etc/sudoers` 控制谁能用 sudo、能用 sudo 干什么。**直接编辑可能锁死系统**，必须用 `visudo`：
+
+    ```bash
+    sudo visudo                  # 用 vim 打开并语法校验后保存
+    ```
+
+    几个常见配置示例：
+
+    ```text
+    # alice 用户可以执行所有 sudo 命令（要密码）
+    alice  ALL=(ALL:ALL) ALL
+
+    # deploy 用户免密重启 nginx
+    deploy ALL=(root) NOPASSWD: /bin/systemctl restart nginx
+
+    # %sudo 组成员可执行所有命令
+    %sudo  ALL=(ALL:ALL) ALL
+    ```
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+  **生产服务器尽量用 `sudo`，不要长期处于 root shell**。误操作风险大，且 `sudo` 在 `/var/log/auth.log` 留审计记录。
+</Warning>
+
+# 3. 环境变量
+
+很多部署问题来自环境变量没设对（最经典：`command not found` 是 PATH 没配）。
+
+<AccordionGroup>
+  <Accordion title="查看当前环境变量">
+    ```bash
+    env                          # 列出所有环境变量
+    echo $PATH                   # 看某一个
+    echo $HOME
+    printenv USER                # 类似 echo
+    set | less                   # 列出所有 shell 变量（含函数）
+    ```
+  </Accordion>
+
+  <Accordion title="临时设置（仅当前 shell 有效）">
+    ```bash
+    export DB_HOST=localhost           # 设置变量并导出
+    export PATH=/opt/myapp/bin:$PATH   # 把目录加到 PATH 最前面
+    unset DB_HOST                      # 删除变量
+
+    # 或者只对单条命令有效（不污染当前 shell）：
+    DB_HOST=localhost ./run.sh
+    ```
+
+    **`export` 的含义**：让子进程也能看到这个变量。不 export 的话，启动的应用读不到。
+  </Accordion>
+
+  <Accordion title="永久设置（每次登录都生效）">
+    把 `export` 写进登录 shell 的初始化文件：
+
+    | 文件 | 适用 | 加载时机 |
+    | --- | --- | --- |
+    | `~/.bashrc` | bash 用户每次开终端都加载 | 每次新开 bash（最常用） |
+    | `~/.profile` 或 `~/.bash_profile` | 登录 shell | 每次登录一次 |
+    | `~/.zshrc` | zsh 用户 | 每次新开 zsh |
+    | `/etc/environment` | 系统级（所有用户） | 系统启动 |
+    | `/etc/profile.d/*.sh` | 系统级，登录时加载 | 每次登录 |
+
+    改完后让它立即生效：
+
+    ```bash
+    source ~/.bashrc      # 或者写成 . ~/.bashrc
+    ```
+  </Accordion>
+
+  <Accordion title="$PATH 是什么">
+    `$PATH` 是用 `:` 分隔的目录列表，shell 在这些目录里找你输入的命令：
+
+    ```bash
+    echo $PATH
+    # /usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+    ```
+
+    **「command not found」** 通常意味着该程序不在 `$PATH` 里。可以：
+
+    1. 用绝对路径调用：`/opt/myapp/bin/myapp`
+    2. 把目录加进 `$PATH`：`export PATH=/opt/myapp/bin:$PATH`
+    3. 持久化：把上一行写到 `~/.bashrc`，下次登录依然有效
+
+    <Tip>
+      新加路径放最前面（`新路径:$PATH`）= 优先用新版；放最后面（`$PATH:新路径`）= 系统已有同名命令优先。
+    </Tip>
+  </Accordion>
+
+  <Accordion title="部署常见环境变量">
+    | 变量 | 用途 |
+    | --- | --- |
+    | `PATH` | 命令搜索路径 |
+    | `HOME` | 当前用户家目录 |
+    | `USER` / `LOGNAME` | 当前用户名 |
+    | `SHELL` | 当前 shell 路径 |
+    | `LANG` / `LC_*` | 语言与本地化（中文系统设 `zh_CN.UTF-8`） |
+    | `TZ` | 时区，如 `Asia/Shanghai` |
+    | `JAVA_HOME` | Java 安装路径 |
+    | `NODE_ENV` | Node.js 应用环境（development / production） |
+    | `LD_LIBRARY_PATH` | 动态链接库搜索路径 |
+
+    **场景**：systemd 服务里通过 `Environment=` 字段传应用的环境变量：
+
+    ```ini
+    [Service]
+    Environment="DB_HOST=db.internal"
+    Environment="DB_PORT=5432"
+    EnvironmentFile=/etc/myapp/env       # 或从文件加载
+    ExecStart=/opt/myapp/run.sh
+    ```
+  </Accordion>
+</AccordionGroup>

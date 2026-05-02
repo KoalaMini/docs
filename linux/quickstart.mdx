@@ -1,0 +1,358 @@
+---
+title: "Linux 快速上手"
+sidebarTitle: "快速上手"
+description: "面向新手运维的入口页：5 分钟应急清单、命令速查、终端基础与 shell 基础"
+---
+
+<Note>
+  **这是什么文档？**
+  一份围绕「在 Linux 服务器上完成部署」组织的命令手册，按主题拆成多个子页。本页是入口和速查清单 —— 第一次接触服务器从这里开始，平时当快速指引也合适。
+</Note>
+
+# 1. 部署 5 分钟应急清单
+
+刚到一台陌生服务器、或者部署后服务异常，按这个清单从上到下排查：
+
+<Steps>
+  <Step title="我在哪？是什么系统？">
+    ```bash
+    pwd                      # 当前目录
+    whoami                   # 我是谁
+    hostname                 # 这台机器叫什么
+    uname -a                 # 内核 + CPU 架构（x86_64 / aarch64）
+    cat /etc/os-release      # 发行版（Ubuntu / CentOS / Debian …）
+    ```
+  </Step>
+  <Step title="资源够不够？">
+    ```bash
+    free -h                  # 内存
+    df -h                    # 磁盘
+    uptime                   # 负载
+    ```
+  </Step>
+  <Step title="服务跑没跑？">
+    ```bash
+    systemctl status nginx      # 看服务状态（替换为你的服务名）
+    ps aux | grep nginx         # 看进程
+    ss -tlnp | grep :80         # 看端口监听
+    ```
+  </Step>
+  <Step title="出了什么错？">
+    ```bash
+    journalctl -u nginx -n 50 --no-pager   # 服务最近 50 行日志
+    tail -f /var/log/nginx/error.log       # 应用日志实时看
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+  **遇到问题不慌**：先 `systemctl status` → 再 `journalctl -u 服务名` → 再看应用日志 → 再看反代日志。 **80% 的部署问题都能从日志里直接读出原因。**
+</Tip>
+
+# 2. 命令速查（按主题跳转）
+
+按你想做的事找对应专题：
+
+<CardGroup cols={2}>
+  <Card title="文件管理" icon="folder" href="/linux/file-management">
+    `ls` `cd` `cp` `mv` `rm` `find` `grep`
+    `chmod` `chown` `tar` `zip`
+    —— 文件操作、查找、权限、压缩
+  </Card>
+  <Card title="服务管理与日志" icon="server" href="/linux/service-management">
+    `systemctl` `journalctl` `ps` `kill` `nohup`
+    —— 启停服务、查进程、看日志
+  </Card>
+  <Card title="用户管理" icon="user" href="/linux/user-management">
+    `useradd` `passwd` `sudo` `su` `export`
+    —— 账号、提权、环境变量
+  </Card>
+  <Card title="网络管理" icon="network-wired" href="/linux/network-management">
+    `ping` `curl` `wget` `ss` `lsof`
+    —— 连通性、HTTP、端口监听
+  </Card>
+  <Card title="SSH 远程访问" icon="terminal" href="/linux/ssh">
+    `ssh` `scp` `rsync` 密钥配置 端口转发
+  </Card>
+  <Card title="Vim 编辑器" icon="pen-to-square" href="/linux/vim">
+    模式切换、移动、编辑、搜索替换
+  </Card>
+</CardGroup>
+
+# 3. 终端基础导航
+
+登录后第一组命令，确认"我在哪、有什么"。
+
+<AccordionGroup>
+  <Accordion title="pwd (print working directory) — 我在哪个目录">
+    ```bash
+    pwd
+    # 输出: /home/alice
+    ```
+
+    每次进新目录、写脚本想知道当前路径，先 `pwd` 一下。
+  </Accordion>
+
+  <Accordion title="ls (list) — 列出目录里有什么">
+    最常用三连击：
+
+    ```bash
+    ls          # 简洁列出
+    ls -l       # -l = --long，长格式（最常用）
+    ls -lh      # 加 -h 让大小变成 1.2K / 3.4M 这种好懂的形式
+    ls -la      # -a = --all，连隐藏文件（.开头）也列出
+    ls -lt      # -t 按修改时间排序，最新的在前
+    ll          # 多数发行版自带的别名 = ls -alF
+    ```
+
+    **`ls -l` 输出每一列怎么看：**
+
+    ```text
+    -rw-r--r--  1  alice  staff   2048  Jul  3 10:15  app.log
+    │└────┬───┘ │  └─┬─┘  └─┬─┘   └─┬┘  └─────┬─────┘  └──┬──┘
+    │   权限    │ 所有者  所属组   大小    修改时间      文件名
+    │           │
+    │           └ 硬链接数（一般无视）
+    └ 文件类型：- 普通文件，d 目录，l 软链接
+    ```
+
+    第一列权限怎么读，详见 [文件管理 → 文件权限](/linux/file-management#4-文件权限-看懂-修改)。
+  </Accordion>
+
+  <Accordion title="cd (change directory) — 切换目录">
+    ```bash
+    cd /etc/nginx     # 进绝对路径
+    cd conf.d         # 进相对路径（当前目录下的 conf.d）
+    cd ..             # 回到上一级
+    cd                # 不带参数 = 回家目录
+    cd ~              # 同上，~ 等于当前用户家目录
+    cd -              # ⭐ 回到上一次所在的目录（部署时来回切换很好用）
+    ```
+
+    | 写法 | 含义 |
+    | --- | --- |
+    | `/etc/nginx` | 绝对路径，从根 `/` 开始 |
+    | `./conf.d` | 相对路径，`.` 当前目录 |
+    | `../logs` | 相对路径，`..` 上级目录 |
+    | `~` | 当前用户家目录 |
+    | `~bob` | 用户 bob 的家目录 |
+  </Accordion>
+</AccordionGroup>
+
+# 4. 系统健康检查
+
+<AccordionGroup>
+  <Accordion title="uname (unix name) / hostname — 系统是什么">
+    ```bash
+    uname -a
+    # Linux web01 5.15.0-91-generic #101-Ubuntu SMP x86_64 GNU/Linux
+    #         │     │                              │
+    #       主机名  内核版本                     CPU 架构
+
+    hostname               # web01
+    cat /etc/os-release    # 看发行版（PRETTY_NAME 一行就够）
+    ```
+
+    **场景**：选 docker 镜像、下二进制包前，先确认架构和发行版。
+  </Accordion>
+
+  <Accordion title="uptime / w / who — 跑了多久 / 谁在线">
+    ```bash
+    uptime
+    # 14:22:30 up 12 days, 3:47, 2 users, load average: 0.15, 0.20, 0.18
+    #          │   运行时长       登录数    ← 1分 / 5分 / 15分 平均负载
+
+    who                    # 当前在线用户
+    w                      # 在线用户 + 他们在做什么
+    last -n 10             # 最近 10 次登录历史（排查异常登录）
+    ```
+
+    **怎么读 load average？**
+    每核满载 = 1.0。4 核机器持续 load > 4 就是压力大。
+  </Accordion>
+
+  <Accordion title="free — 内存够不够">
+    ```bash
+    free -h
+    #              total  used  free  shared  buff/cache  available
+    # Mem:         7.7Gi  2.1Gi 1.2Gi   45Mi       4.4Gi      5.3Gi
+    # Swap:        2.0Gi    0B  2.0Gi
+    ```
+
+    **新手最容易误判的点：**
+    - **不要看 `free` 列**！Linux 会拿空闲内存做磁盘缓存（`buff/cache`），看着 free 很少很正常
+    - **看 `available` 列**才是真正"还能给程序用的内存"
+    - `Swap` 用了不少 = 内存吃紧
+  </Accordion>
+
+  <Accordion title="df (disk free) / du (disk usage) — 磁盘够不够、谁占的">
+    ```bash
+    df -h
+    # Filesystem      Size  Used Avail Use%  Mounted on
+    # /dev/vda1        40G   28G   12G  71%  /
+    ```
+
+    **看 `Use%`**：超过 85% 就该清理。
+
+    **找出占空间最多的目录：**
+
+    ```bash
+    du -sh /var/*                        # 各子目录总大小
+    du -sh /var/* 2>/dev/null | sort -h  # 按大小排序
+    # -s = --summarize，只显示总和
+    # -h = --human-readable
+    ```
+
+    <Warning>
+      磁盘 100% 时连写日志都会失败、服务可能假死。 **看到 100% 立刻清** —— 一般找 `/var/log` 或 `/tmp` 的大文件下手。
+    </Warning>
+  </Accordion>
+
+  <Accordion title="top / htop — 实时监控">
+    ```bash
+    top         # 自带，所有系统都有
+    htop        # 更友好（彩色、可滚动），需 apt install htop
+    ```
+
+    顶部读数：
+
+    ```text
+    %Cpu(s):  12.5 us,  3.0 sy,  0.0 ni, 84.5 id ...
+              ↑用户态    ↑内核态           ↑空闲（id=idle）
+    ```
+
+    `top` 内常用键：`P` 按 CPU 排序、`M` 按内存排序、`q` 退出、`k` 输 PID 杀进程。
+  </Accordion>
+</AccordionGroup>
+
+# 5. 安装软件包
+
+部署的第一件事——把依赖装上。
+
+<Tabs>
+  <Tab title="apt — Ubuntu / Debian">
+    `apt` = **A**dvanced **P**ackage **T**ool。
+
+    ```bash
+    sudo apt update                  # ⭐ 先更新软件源索引（不更新可能装到旧版）
+    sudo apt upgrade                 # 升级所有已安装软件
+    sudo apt install nginx           # 安装
+    sudo apt install -y nginx git    # -y 跳过确认提示（脚本里用）
+    sudo apt remove nginx            # 卸载（保留配置）
+    sudo apt purge nginx             # 卸载并删配置
+    sudo apt autoremove              # 删除不再需要的依赖
+    apt search keyword               # 搜索包
+    apt show nginx                   # 包详情
+    apt list --installed             # 已安装列表
+    ```
+  </Tab>
+  <Tab title="yum / dnf — CentOS / RHEL / Fedora">
+    `yum` = **Y**ellowdog **U**pdater **M**odified；`dnf` = **D**andified **YUM**（yum 升级版）。
+
+    ```bash
+    sudo yum install nginx           # CentOS 7
+    sudo dnf install nginx           # CentOS 8+, Fedora
+    sudo yum update                  # 升级所有
+    sudo yum remove nginx            # 卸载
+    yum search keyword               # 搜索
+    yum list installed               # 已安装
+    yum info nginx                   # 包详情
+    ```
+  </Tab>
+</Tabs>
+
+**部署典型流程：**
+
+```bash
+sudo apt update
+sudo apt install -y nginx python3 python3-pip git
+```
+
+# 6. 管道、重定向、连接命令
+
+把简单命令组合成强大工具链，是 shell 的精髓。
+
+<AccordionGroup>
+  <Accordion title="重定向：把输出写到文件">
+    ```bash
+    ./run.sh > output.log              # 标准输出（stdout）覆盖写入
+    ./run.sh >> output.log             # 追加（不覆盖）
+    ./run.sh 2> error.log              # 标准错误（stderr）单独写
+    ./run.sh > out.log 2>&1            # ⭐ stdout 和 stderr 都写到 out.log
+    ./run.sh > /dev/null 2>&1          # 都丢弃（静默运行）
+    ./run.sh < input.txt               # 从文件读入标准输入
+    ```
+
+    **文件描述符（fd）：**
+
+    | fd | 名称 | 含义 |
+    | --- | --- | --- |
+    | 0 | stdin | 标准输入 |
+    | 1 | stdout | 标准输出 |
+    | 2 | stderr | 标准错误 |
+
+    `2>&1` 的意思：把 fd 2（stderr）重定向到 fd 1（stdout）当前去的地方。
+  </Accordion>
+
+  <Accordion title="管道 |：把上一个命令的输出送给下一个">
+    ```bash
+    ps aux | grep nginx                       # 找 nginx 进程
+    cat app.log | grep ERROR | wc -l          # 数有多少行 ERROR
+    ls -la | head -20                         # 只看前 20 行
+    journalctl -u nginx | grep "404"          # 找 404 记录
+    ```
+  </Accordion>
+
+  <Accordion title="连接命令：; / && / ||">
+    ```bash
+    cmd1 ; cmd2          # 顺序执行（不管前一个成败）
+    cmd1 && cmd2         # ⭐ 前一个成功才执行后一个（部署脚本常用）
+    cmd1 || cmd2         # 前一个失败才执行后一个
+
+    # 部署经典：
+    cd /opt/myapp && git pull && sudo systemctl restart myapp
+    # 任何一步失败就停下来
+    ```
+  </Accordion>
+
+  <Accordion title="xargs — 批量处理">
+    ```bash
+    find . -name "*.tmp" | xargs rm           # 删所有 .tmp
+    cat ips.txt | xargs -I {} ping -c 1 {}    # -I 指定占位符
+    ```
+  </Accordion>
+</AccordionGroup>
+
+# 7. 终端快捷键与帮助系统
+
+<CardGroup cols={2}>
+  <Card title="快捷键">
+    - `Ctrl+C` 中断当前命令
+    - `Ctrl+D` 退出 shell（EOF）
+    - `Ctrl+L` 清屏（= `clear`）
+    - `Ctrl+R` ⭐ 反向搜索历史命令
+    - `Ctrl+A` / `Ctrl+E` 跳行首 / 行尾
+    - `Ctrl+U` / `Ctrl+K` 删光标前 / 后
+    - `Ctrl+W` 删前一个单词
+    - `Tab` ⭐ 自动补全（命令、路径、参数）
+    - `↑` `↓` 翻历史命令
+    - `!!` 重复上一条
+    - `!$` 上条命令的最后一个参数
+    - `sudo !!` 上条加 sudo（漏写时神器）
+  </Card>
+  <Card title="帮助与历史">
+    - `history` 查看历史
+    - `history | grep ssh` 搜索历史
+    - `man <命令>` 完整手册（按 `q` 退出）
+    - `<命令> --help` 简略帮助
+    - `tldr <命令>` 简化示例（`apt install tldr`）
+    - `which <命令>` 命令所在路径
+    - `type <命令>` 是别名/函数/可执行
+    - `clear` 清屏
+    - `reset` 重置终端（乱码救急）
+  </Card>
+</CardGroup>
+
+<Tip>
+  善用 `Tab` 自动补全和 `Ctrl+R` 历史搜索，能把命令行效率提升 3 倍以上。
+</Tip>

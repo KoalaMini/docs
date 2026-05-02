@@ -1,0 +1,363 @@
+---
+title: "Linux 服务管理与日志"
+sidebarTitle: "服务管理"
+description: "进程 / systemctl / journalctl —— 把服务跑起来、保持运行、出问题查日志的全套命令"
+---
+
+<Note>
+  本页覆盖部署最关键的三件事：**看进程、管服务、查日志**。一切围绕"让你的服务持续稳定运行"展开。
+</Note>
+
+# 1. 进程管理
+
+<AccordionGroup>
+  <Accordion title="ps (process status) — 看进程列表">
+    ```bash
+    ps aux                       # 最常用：所有用户的所有进程
+    ps -ef                       # 等价写法（System V 风格）
+    ps aux | grep nginx          # 找 nginx 相关进程
+    ```
+
+    **`ps aux` 输出每一列：**
+
+    ```text
+    USER       PID  %CPU %MEM    VSZ   RSS  TTY  STAT  START   TIME  COMMAND
+    root      1234   0.5  2.3  72048 23456  ?    Ss    Jul01   1:23  /usr/sbin/nginx
+    │          │     │    │    │     │      │    │     │       │     │
+    │         进程ID  CPU% 内存% 虚拟  实占  终端  状态  启动    累计  完整命令
+    │                          内存  内存       (见下) 时间    CPU
+    所属用户
+    ```
+
+    **`STAT` 列状态字符**：
+
+    | 字符 | 含义 |
+    | --- | --- |
+    | `R` | running 运行中 |
+    | `S` | sleeping 睡眠（等 IO/事件，正常状态） |
+    | `D` | 不可中断睡眠（一般在等磁盘 IO） |
+    | `Z` | zombie 僵尸进程 |
+    | `T` | stopped 被暂停 |
+    | `s` | 会话首进程 |
+    | `+` | 前台进程 |
+
+    `aux` 的 `a/u/x` 是单字母选项（不带 `--`）含义：
+
+    - `a` = all w/ tty，所有终端的进程
+    - `u` = user-oriented format，按用户友好的格式
+    - `x` = include processes w/o tty，连后台守护进程也算
+  </Accordion>
+
+  <Accordion title="pgrep / pidof — 直接拿到 PID">
+    ```bash
+    pgrep nginx                  # 列出所有 nginx 进程的 PID
+    pgrep -a nginx               # -a 同时显示完整命令
+    pidof nginx                  # 类似，但只输出 PID
+    ```
+
+    比 `ps aux | grep | awk '{print $2}'` 这种老套路简单多了。
+  </Accordion>
+
+  <Accordion title="kill / killall / pkill — 结束进程">
+    ```bash
+    kill 1234                       # 给 PID 1234 发 SIGTERM（优雅停止）
+    kill -9 1234                    # 发 SIGKILL（强制立即结束，进程无法清理）
+    kill -HUP 1234                  # 发 SIGHUP，常用于「重读配置」
+    killall nginx                   # 按名字杀所有 nginx
+    pkill -f "python app.py"        # -f = --full，按完整命令行匹配
+    ```
+
+    **常用信号**：
+
+    | 信号 | 编号 | 用途 |
+    | --- | --- | --- |
+    | `SIGHUP` | 1 | 终端断开 / 让程序重读配置（nginx -s reload 就发这个） |
+    | `SIGINT` | 2 | 中断（按 `Ctrl+C` 时） |
+    | `SIGTERM` | 15 | 默认信号，优雅终止（程序可以做收尾工作） |
+    | `SIGKILL` | 9 | 强杀，进程无法忽略也无法清理（最后手段） |
+
+    <Tip>
+      **先 `kill`，再 `kill -9`**。直接 `-9` 容易让程序留下损坏文件、占用的端口没释放等问题。
+    </Tip>
+  </Accordion>
+
+  <Accordion title="后台运行：nohup / & / jobs / fg / bg">
+    ```bash
+    ./run.sh                # 前台运行，关终端就死
+    ./run.sh &              # & 后台运行，但关终端仍可能死
+    nohup ./run.sh &        # ⭐ nohup = no hangup，关终端也不死
+    nohup ./run.sh > app.log 2>&1 &   # 标准做法：日志重定向 + 后台
+    ```
+
+    **管理后台任务：**
+
+    ```bash
+    jobs                    # 列出本终端的后台任务
+    fg %1                   # 把任务 1 切回前台
+    bg %1                   # 让暂停的任务在后台继续跑
+    Ctrl+Z                  # 暂停当前前台任务
+    Ctrl+C                  # 终止当前前台任务
+    ```
+
+    <Warning>
+      `nohup` 适合临时启动。 **生产环境建议用 systemd 管理服务**（见下一章），自动重启、日志统一、开机自启。
+    </Warning>
+  </Accordion>
+</AccordionGroup>
+
+# 2. systemctl —— 服务管理
+
+<Note>
+  **systemd** 是现代 Linux（Ubuntu 16+, CentOS 7+, Debian 8+）的初始化系统，负责开机启动、进程管理、日志收集等。
+  **`systemctl` 就是控制 systemd 的命令** —— 部署完任何长期运行的服务（nginx / mysql / 你自己的应用），都靠它启动 / 停止 / 设置开机自启 / 看状态。
+</Note>
+
+## 2.1 核心概念：unit / service
+
+- **unit（单元）**：systemd 管理的对象，一个服务、一个挂载点、一个定时任务都是 unit
+- **service（服务）**：最常见的 unit 类型，文件名以 `.service` 结尾
+- **unit 文件位置**：
+  - 系统自带：`/lib/systemd/system/`（不要改）
+  - 自定义/覆盖：`/etc/systemd/system/`（在这里写自己的）
+
+## 2.2 看状态：你最常用的命令
+
+```bash
+systemctl status nginx                                # ⭐ 看一个服务的运行状态
+systemctl is-active nginx                             # 只输出 active / inactive
+systemctl is-enabled nginx                            # 是否开机自启
+systemctl list-units --type=service                   # 列出所有运行中的服务
+systemctl list-units --type=service --state=failed    # 列出挂掉的服务
+systemctl list-unit-files --type=service              # 列出所有定义过的服务（含未启用）
+```
+
+**`systemctl status nginx` 输出怎么读：**
+
+```text
+● nginx.service - A high performance web server
+     Loaded: loaded (/lib/systemd/system/nginx.service; enabled; ...)
+     Active: active (running) since Wed 2026-05-02 10:00:00 UTC; 2h ago
+   Main PID: 1234 (nginx)
+      Tasks: 3 (limit: 4915)
+     Memory: 12.3M
+        CPU: 215ms
+     CGroup: /system.slice/nginx.service
+             ├─1234 nginx: master process /usr/sbin/nginx
+             └─1235 nginx: worker process
+
+May 02 10:00:00 web01 systemd[1]: Started A high performance web server.
+May 02 10:00:01 web01 nginx[1234]: configuration test successful
+```
+
+**重点看：**
+
+| 行 | 看什么 |
+| --- | --- |
+| 第一行 `●` 颜色 | 绿点 = 正常，红点 = 失败 |
+| `Loaded:` | enabled 表示开机会自启，disabled 不会 |
+| `Active:` | active (running) 正常；failed 出问题；inactive 没启 |
+| 末尾几行日志 | 出错时关键信息一般在这里 |
+
+## 2.3 操控服务：start / stop / restart / reload
+
+```bash
+sudo systemctl start nginx              # 启动
+sudo systemctl stop nginx               # 停止
+sudo systemctl restart nginx            # 重启（先 stop 再 start，会有短暂中断）
+sudo systemctl reload nginx             # 平滑重载配置（不中断，仅部分服务支持）
+sudo systemctl reload-or-restart nginx  # 优先 reload，不支持则 restart
+```
+
+<Tip>
+  **改了配置后**：能 `reload` 就 `reload`（无中断），不行才 `restart`。比如 nginx 改 `nginx.conf` 后用 `reload` 即可。
+</Tip>
+
+## 2.4 开机自启：enable / disable
+
+```bash
+sudo systemctl enable nginx           # 设置开机自启（不会立即启动）
+sudo systemctl enable --now nginx     # ⭐ 同时立即启动 + 设置自启
+sudo systemctl disable nginx          # 取消开机自启（不会停止当前进程）
+sudo systemctl disable --now nginx    # 同时立即停止 + 取消自启
+```
+
+<Warning>
+  `enable` ≠ `start`。`enable` 只是配置开机自启，**不会立即启动**。要立即启动必须显式 `start`，或者加 `--now`。
+</Warning>
+
+## 2.5 修改 unit 文件后必做：daemon-reload
+
+只要你新建或修改了 `.service` 文件，systemd 不会自动感知，必须：
+
+```bash
+sudo systemctl daemon-reload          # ⭐ 重新加载所有 unit 文件配置
+sudo systemctl restart myapp          # 然后重启服务让新配置生效
+```
+
+**忘了 `daemon-reload` 是新手最常踩的坑** —— 明明改了文件却不生效。
+
+## 2.6 写一个自己的 service 文件
+
+部署一个 Python 应用作示例：
+
+<Steps>
+  <Step title="新建 service 文件">
+    ```bash
+    sudo vim /etc/systemd/system/myapp.service
+    ```
+
+    内容：
+
+    ```ini
+    [Unit]
+    Description=My Python Application
+    After=network.target              # 等网络就绪后再启动
+
+    [Service]
+    Type=simple                       # 进程不 fork，前台运行
+    User=www-data                     # 用哪个用户跑（安全起见别用 root）
+    WorkingDirectory=/opt/myapp       # 工作目录
+    ExecStart=/usr/bin/python3 /opt/myapp/app.py
+    Restart=on-failure                # 进程崩溃自动重启
+    RestartSec=5                      # 重启间隔 5 秒
+    StandardOutput=journal            # 标准输出写入 journal 日志
+    StandardError=journal
+
+    [Install]
+    WantedBy=multi-user.target        # 多用户模式时启动（即正常开机）
+    ```
+  </Step>
+  <Step title="加载并启动">
+    ```bash
+    sudo systemctl daemon-reload         # 让 systemd 看到新文件
+    sudo systemctl enable --now myapp    # 设置自启 + 立即启动
+    sudo systemctl status myapp          # 确认运行
+    ```
+  </Step>
+  <Step title="改了文件之后">
+    ```bash
+    sudo systemctl daemon-reload         # 必须！
+    sudo systemctl restart myapp
+    ```
+  </Step>
+</Steps>
+
+# 3. 看日志
+
+部署系统的核心活动之一就是看日志。systemd 服务用 `journalctl`，应用日志用 `tail -f`。
+
+## 3.1 journalctl — systemd 日志
+
+```bash
+journalctl -u nginx                          # 看 nginx 服务的所有日志
+journalctl -u nginx -n 100                   # -n 最近 100 行
+journalctl -u nginx -f                       # ⭐ 实时跟踪（tail -f 的 systemd 版）
+journalctl -u nginx --since "10 min ago"     # 最近 10 分钟
+journalctl -u nginx --since "2026-05-02 10:00"
+journalctl -u nginx --since today
+journalctl -u nginx -p err                   # -p = priority，只看 error 级别
+journalctl -u nginx --no-pager               # 不分页直接输出（脚本里用）
+journalctl -xe                               # 看系统级最近错误（启动失败常用）
+```
+
+**`-p` 优先级（priority）速查：**
+
+| 级别 | 名称 |
+| --- | --- |
+| 0 | emerg |
+| 1 | alert |
+| 2 | crit |
+| 3 | err |
+| 4 | warning |
+| 5 | notice |
+| 6 | info |
+| 7 | debug |
+
+## 3.2 tail -f — 应用日志实时看
+
+```bash
+tail -f /var/log/nginx/error.log              # 应用日志
+tail -f /var/log/nginx/error.log | grep ERROR # 只看 ERROR
+tail -f -n 100 app.log                        # 先显示最后 100 行再实时跟
+```
+
+`Ctrl+C` 退出。
+
+## 3.3 日志通常在哪里
+
+| 路径 | 内容 |
+| --- | --- |
+| `/var/log/syslog` 或 `/var/log/messages` | 系统综合日志 |
+| `/var/log/auth.log` 或 `/var/log/secure` | 登录/sudo 相关（排查异常登录） |
+| `/var/log/nginx/access.log` | Nginx 访问日志 |
+| `/var/log/nginx/error.log` | Nginx 错误日志 |
+| `/var/log/mysql/` | MySQL 日志 |
+| `journalctl -u <服务>` | systemd 管的服务，日志走这里 |
+
+<Tip>
+  **日志归档**：服务跑久了日志会越来越大。`logrotate` 是系统自带的日志切割工具，配置在 `/etc/logrotate.d/`。看到 `xxx.log.1`、`xxx.log.2.gz` 这些文件就是它分割出来的。
+</Tip>
+
+## 3.4 部署排错黄金流程
+
+```bash
+sudo systemctl restart myapp
+sudo systemctl status myapp                  # 看是否 active
+journalctl -u myapp -n 50 --no-pager         # 没起来就看日志
+tail -f /var/log/nginx/error.log             # 反代的错也要看
+```
+
+# 4. 附录：部署一个 Web 服务的完整命令链
+
+把进程 / 服务 / 日志和其他章节的命令串起来，跑一遍：
+
+```bash
+# 1. 登录后看清状况
+ssh deploy@web01
+pwd && whoami && uname -a
+df -h && free -h
+
+# 2. 安装依赖
+sudo apt update
+sudo apt install -y nginx python3 python3-pip git
+
+# 3. 上传/拉取代码
+cd /opt
+sudo git clone https://github.com/me/myapp.git
+sudo chown -R deploy:deploy /opt/myapp
+cd /opt/myapp
+
+# 4. 装 Python 依赖
+pip3 install -r requirements.txt
+
+# 5. 写 systemd 服务
+sudo vim /etc/systemd/system/myapp.service       # 按 2.6 章模板
+sudo systemctl daemon-reload
+sudo systemctl enable --now myapp
+
+# 6. 检查
+sudo systemctl status myapp
+ss -tlnp | grep :8000
+curl http://localhost:8000/health
+
+# 7. 配置 nginx 反向代理
+sudo vim /etc/nginx/sites-available/myapp
+sudo ln -s /etc/nginx/sites-available/myapp /etc/nginx/sites-enabled/
+sudo nginx -t                # 测试配置
+sudo systemctl reload nginx  # 平滑重载
+
+# 8. 验证
+curl -I http://your-domain.com
+
+# 9. 出问题查日志
+sudo journalctl -u myapp -n 100 --no-pager
+sudo tail -f /var/log/nginx/error.log
+```
+
+<Tip>
+  这套流程涉及到的其他主题：
+  - 用户与 sudo —— [用户管理](/linux/user-management)
+  - 文件权限与软链接 —— [文件管理](/linux/file-management)
+  - curl / ss 网络验证 —— [网络管理](/linux/network-management)
+  - ssh 远程登录 —— [SSH 专题](/linux/ssh)
+</Tip>

@@ -97,10 +97,19 @@
         "menu": [
           {
             "item": "Linux",
-            "pages": [
-              "linux/commands",
-              "linux/ssh",
-              "linux/vim"
+            "groups": [
+              {
+                "group": "命令大全",
+                "pages": [
+                  "linux/quickstart",
+                  "linux/file-management",
+                  "linux/service-management",
+                  "linux/user-management",
+                  "linux/network-management",
+                  "linux/ssh",
+                  "linux/vim"
+                ]
+              }
             ]
           }
         ]
