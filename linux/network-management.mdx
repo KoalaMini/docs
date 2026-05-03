@@ -8,7 +8,7 @@ description: "ping / curl / ss / lsof —— 部署后服务通不通的全套�
   部署后最高频的问题：「服务启动了但访问不通」。本页这些命令帮你按层定位 —— 是网络问题、防火墙问题，还是服务根本没监听。
 </Note>
 
-# 1. 连通性测试：ping
+## 1. 连通性测试：ping
 
 ```bash
 ping baidu.com              # 持续 ping，按 Ctrl+C 停止
@@ -24,7 +24,7 @@ ping -W 1 -c 3 baidu.com    # -W 单次响应超时（秒）
 - 不通 → 可能是网络断、对方防火墙拒 ICMP（很多云主机默认禁 ping，**不能 ping 通不代表服务不通**）
 - 看 `time=` 数值判断延迟、看 `0% packet loss` 判断丢包
 
-# 2. HTTP 测试与下载
+## 2. HTTP 测试与下载
 
 <AccordionGroup>
   <Accordion title="curl (Client for URLs) — 测 HTTP 服务">
@@ -72,7 +72,7 @@ ping -W 1 -c 3 baidu.com    # -W 单次响应超时（秒）
   </Accordion>
 </AccordionGroup>
 
-# 3. 端口与连接：ss / netstat / lsof
+## 3. 端口与连接：ss / netstat / lsof
 
 <AccordionGroup>
   <Accordion title="ss (socket statistics) — 看端口监听（推荐）">
@@ -133,7 +133,7 @@ ping -W 1 -c 3 baidu.com    # -W 单次响应超时（秒）
   </Accordion>
 </AccordionGroup>
 
-# 4. 排查思路：服务通不通的标准流程
+## 4. 排查思路：服务通不通的标准流程
 
 <Steps>
   <Step title="服务有没有起来？">
@@ -182,7 +182,7 @@ ping -W 1 -c 3 baidu.com    # -W 单次响应超时（秒）
   </Step>
 </Steps>
 
-# 5. 抓包与诊断（进阶了解）
+## 5. 抓包与诊断（进阶了解）
 
 ```bash
 sudo tcpdump -i any port 80         # 抓 80 端口的包

@@ -8,7 +8,7 @@ description: "进程 / systemctl / journalctl —— 把服务跑起来、保持
   本页覆盖部署最关键的三件事：**看进程、管服务、查日志**。一切围绕"让你的服务持续稳定运行"展开。
 </Note>
 
-# 1. 进程管理
+## 1. 进程管理
 
 <AccordionGroup>
   <Accordion title="ps (process status) — 看进程列表">
@@ -105,14 +105,14 @@ description: "进程 / systemctl / journalctl —— 把服务跑起来、保持
   </Accordion>
 </AccordionGroup>
 
-# 2. systemctl —— 服务管理
+## 2. systemctl —— 服务管理
 
 <Note>
   **systemd** 是现代 Linux（Ubuntu 16+, CentOS 7+, Debian 8+）的初始化系统，负责开机启动、进程管理、日志收集等。
   **`systemctl` 就是控制 systemd 的命令** —— 部署完任何长期运行的服务（nginx / mysql / 你自己的应用），都靠它启动 / 停止 / 设置开机自启 / 看状态。
 </Note>
 
-## 2.1 核心概念：unit / service
+### 2.1 核心概念：unit / service
 
 - **unit（单元）**：systemd 管理的对象，一个服务、一个挂载点、一个定时任务都是 unit
 - **service（服务）**：最常见的 unit 类型，文件名以 `.service` 结尾
@@ -120,7 +120,7 @@ description: "进程 / systemctl / journalctl —— 把服务跑起来、保持
   - 系统自带：`/lib/systemd/system/`（不要改）
   - 自定义/覆盖：`/etc/systemd/system/`（在这里写自己的）
 
-## 2.2 看状态：你最常用的命令
+### 2.2 看状态：你最常用的命令
 
 ```bash
 systemctl status nginx                                # ⭐ 看一个服务的运行状态
@@ -158,7 +158,7 @@ May 02 10:00:01 web01 nginx[1234]: configuration test successful
 | `Active:` | active (running) 正常；failed 出问题；inactive 没启 |
 | 末尾几行日志 | 出错时关键信息一般在这里 |
 
-## 2.3 操控服务：start / stop / restart / reload
+### 2.3 操控服务：start / stop / restart / reload
 
 ```bash
 sudo systemctl start nginx              # 启动
@@ -172,7 +172,7 @@ sudo systemctl reload-or-restart nginx  # 优先 reload，不支持则 restart
   **改了配置后**：能 `reload` 就 `reload`（无中断），不行才 `restart`。比如 nginx 改 `nginx.conf` 后用 `reload` 即可。
 </Tip>
 
-## 2.4 开机自启：enable / disable
+### 2.4 开机自启：enable / disable
 
 ```bash
 sudo systemctl enable nginx           # 设置开机自启（不会立即启动）
@@ -185,7 +185,7 @@ sudo systemctl disable --now nginx    # 同时立即停止 + 取消自启
   `enable` ≠ `start`。`enable` 只是配置开机自启，**不会立即启动**。要立即启动必须显式 `start`，或者加 `--now`。
 </Warning>
 
-## 2.5 修改 unit 文件后必做：daemon-reload
+### 2.5 修改 unit 文件后必做：daemon-reload
 
 只要你新建或修改了 `.service` 文件，systemd 不会自动感知，必须：
 
@@ -196,7 +196,7 @@ sudo systemctl restart myapp          # 然后重启服务让新配置生效
 
 **忘了 `daemon-reload` 是新手最常踩的坑** —— 明明改了文件却不生效。
 
-## 2.6 写一个自己的 service 文件
+### 2.6 写一个自己的 service 文件
 
 部署一个 Python 应用作示例：
 
@@ -242,11 +242,11 @@ sudo systemctl restart myapp          # 然后重启服务让新配置生效
   </Step>
 </Steps>
 
-# 3. 看日志
+## 3. 看日志
 
 部署系统的核心活动之一就是看日志。systemd 服务用 `journalctl`，应用日志用 `tail -f`。
 
-## 3.1 journalctl — systemd 日志
+### 3.1 journalctl — systemd 日志
 
 ```bash
 journalctl -u nginx                          # 看 nginx 服务的所有日志
@@ -273,7 +273,7 @@ journalctl -xe                               # 看系统级最近错误（启动
 | 6 | info |
 | 7 | debug |
 
-## 3.2 tail -f — 应用日志实时看
+### 3.2 tail -f — 应用日志实时看
 
 ```bash
 tail -f /var/log/nginx/error.log              # 应用日志
@@ -283,7 +283,7 @@ tail -f -n 100 app.log                        # 先显示最后 100 行再实时
 
 `Ctrl+C` 退出。
 
-## 3.3 日志通常在哪里
+### 3.3 日志通常在哪里
 
 | 路径 | 内容 |
 | --- | --- |
@@ -298,7 +298,7 @@ tail -f -n 100 app.log                        # 先显示最后 100 行再实时
   **日志归档**：服务跑久了日志会越来越大。`logrotate` 是系统自带的日志切割工具，配置在 `/etc/logrotate.d/`。看到 `xxx.log.1`、`xxx.log.2.gz` 这些文件就是它分割出来的。
 </Tip>
 
-## 3.4 部署排错黄金流程
+### 3.4 部署排错黄金流程
 
 ```bash
 sudo systemctl restart myapp
@@ -307,7 +307,7 @@ journalctl -u myapp -n 50 --no-pager         # 没起来就看日志
 tail -f /var/log/nginx/error.log             # 反代的错也要看
 ```
 
-# 4. 附录：部署一个 Web 服务的完整命令链
+## 4. 附录：部署一个 Web 服务的完整命令链
 
 把进程 / 服务 / 日志和其他章节的命令串起来，跑一遍：
 

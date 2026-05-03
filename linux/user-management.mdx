@@ -1,14 +1,14 @@
 ---
 title: "Linux 用户管理"
 sidebarTitle: "用户管理"
-description: "用户账号、sudo 提权、环境变量 —— 部署中关于「身份」的所有事"
+description: "用户账号、用户组、sudo 提权、环境变量 —— 部署中关于「身份」的所有事"
 ---
 
 <Note>
-  本页覆盖部署中和"身份"相关的命令：建账号、改密码、加入 sudo 组、用 sudo 提权、配置环境变量。生产环境绝大多数操作都不该用 root，理解这一组命令是基础。
+  本页覆盖部署中和"身份"相关的命令：建账号、改密码、加入用户组（如 Rocky Linux 的 `wheel`）、用 sudo 提权、配置环境变量。生产环境绝大多数操作都不该用 root，理解这一组命令是基础。
 </Note>
 
-# 1. 用户账号管理
+## 1. 用户账号管理
 
 <AccordionGroup>
   <Accordion title="useradd / userdel / passwd / usermod — 增删改用户">
@@ -22,8 +22,9 @@ description: "用户账号、sudo 提权、环境变量 —— 部署中关于�
     sudo passwd alice            # passwd = password
     # 然后按提示输入两次密码
 
-    # 修改用户：加入 sudo 组
-    sudo usermod -aG sudo alice
+    # 修改用户：加入管理员组（详见第 2 章）
+    sudo usermod -aG wheel alice    # Rocky / RHEL / CentOS / AlmaLinux
+    # sudo usermod -aG sudo alice   # Ubuntu / Debian
     # -a = --append，追加（不要漏！否则会替换掉原有组）
     # -G = --groups，指定要加入的组
 
@@ -73,7 +74,221 @@ description: "用户账号、sudo 提权、环境变量 —— 部署中关于�
   </Accordion>
 </AccordionGroup>
 
-# 2. sudo / su — 提权
+## 2. 用户组与管理员权限（以 Rocky Linux 为例）
+
+<Note>
+  Linux 通过 **「用户组」** 实现权限的批量管理 —— 把权限授予一个组，组内所有成员立即获得。本节用 Rocky Linux 演示**用户、组、sudo 权限**三者的关系，这套模型同样适用于 RHEL / CentOS / AlmaLinux。
+</Note>
+
+### 2.1 用户、组、权限：三个关键文件
+
+每个用户都属于至少一个**主组**，可以加入多个**附加组**。
+
+```bash
+id aimee
+# uid=1001(aimee) gid=1001(aimee) groups=1001(aimee),10(wheel),100(developers)
+#                                          │           │           │
+#                                       主组       附加组1      附加组2
+```
+
+| 文件 | 内容 | 谁能读 |
+| --- | --- | --- |
+| `/etc/passwd` | 用户列表（一行一个） | 所有人 |
+| `/etc/group` | 用户组列表 | 所有人 |
+| `/etc/shadow` | 加密后的用户密码 | 仅 root |
+| `/etc/sudoers` | 谁能用 sudo、能用 sudo 干什么 | 仅 root |
+
+```bash
+cat /etc/group | grep wheel
+# wheel:x:10:aimee,bob       <-- aimee 和 bob 都在 wheel 组
+#  │    │  │   └ 该组成员
+#  │    │  └─ GID
+#  │    └─ 密码占位（极少使用）
+#  └─ 组名
+```
+
+### 2.2 wheel 组：Rocky Linux 的「管理员组」
+
+不同发行版的「管理员组」叫法不同：
+
+| 发行版 | 管理员组名 |
+| --- | --- |
+| **Rocky Linux / RHEL / CentOS / AlmaLinux** | `wheel` |
+| Ubuntu / Debian | `sudo` |
+
+`wheel` 这个名字源自 BSD 传统，意思是「掌握方向盘的人」。**在 Rocky Linux 上，把用户加进 wheel 组 ≈ 给它 sudo 权限**（具体规则见 2.4 节的 `/etc/sudoers`）。
+
+### 2.3 让 aimee 拥有 sudo 权限：完整流程
+
+<Steps>
+  <Step title="确认或创建 aimee 用户">
+    ```bash
+    id aimee 2>/dev/null || sudo useradd -m -s /bin/bash aimee
+    sudo passwd aimee                    # 设置密码
+    ```
+  </Step>
+  <Step title="把 aimee 加入 wheel 组">
+    ```bash
+    sudo usermod -aG wheel aimee
+    # -a = --append    追加到现有组
+    # -G = --groups    指定附加组
+    ```
+
+    <Warning>
+      **`-a` 务必加上！** 单独使用 `usermod -G wheel aimee` 会把 aimee 从其他所有附加组中**踢出**，只剩 wheel —— 这是新手最常踩的坑。
+    </Warning>
+  </Step>
+  <Step title="验证组关系">
+    ```bash
+    id aimee
+    # uid=1001(aimee) gid=1001(aimee) groups=1001(aimee),10(wheel)
+
+    getent group wheel
+    # wheel:x:10:aimee
+    ```
+  </Step>
+  <Step title="aimee 重新登录后即可使用 sudo">
+    ```bash
+    su - aimee
+    sudo whoami                          # 输入 aimee 自己的密码，输出 root = 配置成功
+    ```
+
+    <Note>
+      **附加组变更需要重新登录才生效**。aimee 当前已登录的会话仍持有旧组身份，必须 `exit` 重连。
+    </Note>
+  </Step>
+</Steps>
+
+### 2.4 看清谁有管理员权限：/etc/sudoers
+
+`/etc/sudoers` 是 sudo 权限的总规则文件。先 `cat` 看一下默认内容：
+
+```bash
+sudo cat /etc/sudoers
+```
+
+Rocky Linux 默认的关键几行（去掉注释）：
+
+```text
+root    ALL=(ALL)       ALL
+%wheel  ALL=(ALL)       ALL
+# %wheel ALL=(ALL) NOPASSWD: ALL          ← 注释掉的「免密」版本
+#includedir /etc/sudoers.d
+```
+
+**这一行 `%wheel ALL=(ALL) ALL` 怎么读：**
+
+```text
+%wheel    ALL    =    (ALL)         ALL
+  │        │          │              │
+  │        │          │              └ 可以执行哪些命令（ALL = 任何命令）
+  │        │          └ 可以切换到哪些用户身份（ALL = 任何用户，包括 root）
+  │        └ 在哪些主机生效（sudoers 可被多机共享，ALL = 所有主机）
+  └ 谁。% 前缀 = 用户组；不带 % = 用户名
+```
+
+**关键认识**：正是这一行让"加入 wheel 组"等价于"获得 sudo 权限"。如果删掉它，wheel 组就失去特权了。
+
+`#includedir /etc/sudoers.d`（虽然以 `#` 开头但**不是注释**，是 sudoers 特殊语法）会加载该目录下所有规则文件。**生产环境推荐把自定义规则放进独立文件**，不要直接动 `/etc/sudoers`：
+
+```bash
+sudo visudo -f /etc/sudoers.d/deploy      # visudo 会带语法校验
+```
+
+写入：
+
+```text
+# deploy 用户免密重启 nginx 与 myapp（其他命令不行）
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart nginx, /usr/bin/systemctl restart myapp
+```
+
+<Warning>
+  **任何时候编辑 sudoers 都用 `visudo`，不要直接 `vim`！** visudo 会做语法校验 —— 文件一旦写错，**所有人都用不了 sudo，可能把自己锁死**。`visudo -c` 可单独检查语法。
+</Warning>
+
+### 2.5 「管理员权限」具体能干什么
+
+`sudo` 拿到的是 **root 权限**。在 Linux 里，root 几乎无所不能：
+
+| 类别 | 例子 |
+| --- | --- |
+| 系统配置 | 改 `/etc/` 下任何文件、`dnf install` 装卸软件包 |
+| 用户管理 | 增删改用户和组、改任何人密码 |
+| 服务管理 | `systemctl` 启停服务、改 `.service` 文件 |
+| 网络与防火墙 | 配置网卡、`firewall-cmd` 规则 |
+| 文件系统 | 挂载分区、读写所有人的文件 |
+| 进程 | 杀死任何进程、改进程优先级 |
+| 内核 | 加载内核模块、改 sysctl 参数 |
+
+**理解关键**：root 的权限不是"无视所有规则"，而是"权限检查的例外" —— 内核遇到 UID=0 直接放行（少数例外：SELinux 强制策略、`chattr +i` 不可变属性等）。
+
+### 2.6 用户组与文件权限的关系
+
+回顾[文件权限](/linux/file-management)中的 `rwxr-xr-x` 三段：第一段是**所有者**、第二段是**所属组**、第三段是**其他人**。**这就是用户组存在的最大意义** —— 让一个文件的访问权限可以被一群人共享。
+
+**典型场景**：让 aimee 和 bob 协作维护 `/opt/myapp/`。
+
+<Steps>
+  <Step title="建一个团队组">
+    ```bash
+    sudo groupadd developers
+    sudo usermod -aG developers aimee
+    sudo usermod -aG developers bob
+    ```
+  </Step>
+  <Step title="改目录所属组 + 给组写权限">
+    ```bash
+    sudo chgrp -R developers /opt/myapp           # 改所属组（递归）
+    sudo chmod -R 770 /opt/myapp                  # u=rwx g=rwx o=---
+    sudo chmod g+s /opt/myapp                     # ⭐ setgid：新建文件自动继承组
+    ```
+
+    `chmod g+s` 给目录加 **setgid 位**：之后在里面新建的文件 / 子目录会**自动属于 developers 组**，不用每次手动 chgrp。
+  </Step>
+  <Step title="验证">
+    ```bash
+    ls -ld /opt/myapp
+    # drwxrws---  3 root developers ... /opt/myapp
+    #         │
+    #         └ s 表示 setgid 已生效
+    ```
+  </Step>
+</Steps>
+
+**对比：sudo 权限 vs 文件组权限**
+
+| 维度 | sudo（管理员权限） | 用户组（文件权限） |
+| --- | --- | --- |
+| 控制什么 | 命令的执行能力（提权） | 文件 / 目录的读写执行 |
+| 配置在哪 | `/etc/sudoers`、`/etc/sudoers.d/` | 文件本身的元数据（chgrp / chmod） |
+| 颗粒度 | 可精细到单条命令 | 仅 r / w / x 三种 |
+| 典型场景 | 让 deploy 用户能 `systemctl restart nginx` | 让团队共享 `/opt/myapp/` |
+
+简而言之：**sudo 决定"你能不能跑某条命令"，文件组决定"你能不能动某个文件"**。两者互为补充。
+
+### 2.7 用户组管理速查
+
+```bash
+# ── 查看 ──
+groups aimee                          # aimee 在哪些组
+id aimee                              # 含 UID/GID 的完整信息
+getent group wheel                    # wheel 组的所有成员（推荐，容器/LDAP 也通用）
+
+# ── 创建 / 删除组 ──
+sudo groupadd developers
+sudo groupdel developers
+
+# ── 加入 / 移出 ──
+sudo usermod -aG developers aimee     # 加入（务必带 -a）
+sudo gpasswd -d aimee developers      # 从组中移出
+sudo gpasswd -M aimee,bob developers  # ⚠️ -M 直接重设组成员（覆盖式，慎用）
+
+# ── 改文件所属组 ──
+sudo chgrp developers file.txt
+sudo chown :developers file.txt       # chown 也能改组（用户名留空）
+```
+
+## 3. sudo / su — 提权
 
 <AccordionGroup>
   <Accordion title="sudo (superuser do) — 单条命令提权（推荐）">
@@ -107,25 +322,8 @@ description: "用户账号、sudo 提权、环境变量 —— 部署中关于�
     </Note>
   </Accordion>
 
-  <Accordion title="配置 sudoers（进阶了解）">
-    `/etc/sudoers` 控制谁能用 sudo、能用 sudo 干什么。**直接编辑可能锁死系统**，必须用 `visudo`：
-
-    ```bash
-    sudo visudo                  # 用 vim 打开并语法校验后保存
-    ```
-
-    几个常见配置示例：
-
-    ```text
-    # alice 用户可以执行所有 sudo 命令（要密码）
-    alice  ALL=(ALL:ALL) ALL
-
-    # deploy 用户免密重启 nginx
-    deploy ALL=(root) NOPASSWD: /bin/systemctl restart nginx
-
-    # %sudo 组成员可执行所有命令
-    %sudo  ALL=(ALL:ALL) ALL
-    ```
+  <Accordion title="sudo 权限的精细配置 → 见 2.4 节">
+    本章节聚焦 `sudo` / `su` 命令的**使用**。如何**配置**谁能 sudo、能 sudo 干什么（包括 `/etc/sudoers`、`visudo`、wheel 组），已在 [2.4 看清谁有管理员权限](#2-4-看清谁有管理员权限-etc-sudoers) 与 [2.7 用户组管理速查](#2-7-用户组管理速查) 中完整覆盖。
   </Accordion>
 </AccordionGroup>
 
@@ -133,7 +331,7 @@ description: "用户账号、sudo 提权、环境变量 —— 部署中关于�
   **生产服务器尽量用 `sudo`，不要长期处于 root shell**。误操作风险大，且 `sudo` 在 `/var/log/auth.log` 留审计记录。
 </Warning>
 
-# 3. 环境变量
+## 4. 环境变量
 
 很多部署问题来自环境变量没设对（最经典：`command not found` 是 PATH 没配）。
 

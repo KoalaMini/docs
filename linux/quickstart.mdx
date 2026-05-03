@@ -9,7 +9,7 @@ description: "面向新手运维的入口页：5 分钟应急清单、命令速�
   一份围绕「在 Linux 服务器上完成部署」组织的命令手册，按主题拆成多个子页。本页是入口和速查清单 —— 第一次接触服务器从这里开始，平时当快速指引也合适。
 </Note>
 
-# 1. 部署 5 分钟应急清单
+## 1. 部署 5 分钟应急清单
 
 刚到一台陌生服务器、或者部署后服务异常，按这个清单从上到下排查：
 
@@ -49,7 +49,7 @@ description: "面向新手运维的入口页：5 分钟应急清单、命令速�
   **遇到问题不慌**：先 `systemctl status` → 再 `journalctl -u 服务名` → 再看应用日志 → 再看反代日志。 **80% 的部署问题都能从日志里直接读出原因。**
 </Tip>
 
-# 2. 命令速查（按主题跳转）
+## 2. 命令速查（按主题跳转）
 
 按你想做的事找对应专题：
 
@@ -79,7 +79,7 @@ description: "面向新手运维的入口页：5 分钟应急清单、命令速�
   </Card>
 </CardGroup>
 
-# 3. 终端基础导航
+## 3. 终端基础导航
 
 登录后第一组命令，确认"我在哪、有什么"。
 
@@ -139,7 +139,7 @@ description: "面向新手运维的入口页：5 分钟应急清单、命令速�
   </Accordion>
 </AccordionGroup>
 
-# 4. 系统健康检查
+## 4. 系统健康检查
 
 <AccordionGroup>
   <Accordion title="uname (unix name) / hostname — 系统是什么">
@@ -225,7 +225,7 @@ description: "面向新手运维的入口页：5 分钟应急清单、命令速�
   </Accordion>
 </AccordionGroup>
 
-# 5. 安装软件包
+## 5. 安装软件包
 
 部署的第一件事——把依赖装上。
 
@@ -268,7 +268,7 @@ sudo apt update
 sudo apt install -y nginx python3 python3-pip git
 ```
 
-# 6. 管道、重定向、连接命令
+## 6. 管道、重定向、连接命令
 
 把简单命令组合成强大工具链，是 shell 的精髓。
 
@@ -323,7 +323,7 @@ sudo apt install -y nginx python3 python3-pip git
   </Accordion>
 </AccordionGroup>
 
-# 7. 终端快捷键与帮助系统
+## 7. 终端快捷键与帮助系统
 
 <CardGroup cols={2}>
   <Card title="快捷键">

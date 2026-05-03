@@ -8,7 +8,7 @@ description: "ssh / scp / rsync 命令详解，包含密钥配置、端口转发
   **ssh** = **S**ecure **Sh**ell，安全外壳协议，用于在不安全网络上加密远程登录与命令执行；标准端口 22。
 </Note>
 
-# 1. ssh — 远程登录
+## 1. ssh — 远程登录
 
 <AccordionGroup>
   <Accordion title="基本登录">
@@ -73,7 +73,7 @@ description: "ssh / scp / rsync 命令详解，包含密钥配置、端口转发
   </Accordion>
 </AccordionGroup>
 
-# 2. 端口转发（隧道）
+## 2. 端口转发（隧道）
 
 <AccordionGroup>
   <Accordion title="-L 本地转发（Local forwarding）">
@@ -113,7 +113,7 @@ description: "ssh / scp / rsync 命令详解，包含密钥配置、端口转发
   </Accordion>
 </AccordionGroup>
 
-# 3. scp — 文件传输
+## 3. scp — 文件传输
 
 <Note>
   **scp** = **S**ecure **C**o**p**y，基于 ssh 的文件传输；语法类似 `cp`，但路径可加 `user@host:`。
@@ -133,7 +133,7 @@ scp -C file user@host:/tmp/                 # -C 启用压缩（compression）
   scp 在新版 OpenSSH 中已被视为遗留协议，传大量文件或目录建议改用 `rsync` 或 `sftp`。
 </Warning>
 
-# 4. rsync — 增量同步
+## 4. rsync — 增量同步
 
 <Note>
   **rsync** = **r**emote **sync**，差量同步算法只传输变化部分，适合大文件、目录、备份。
@@ -172,7 +172,7 @@ scp -C file user@host:/tmp/                 # -C 启用压缩（compression）
   </Accordion>
 </AccordionGroup>
 
-# 5. 排错小贴士
+## 5. 排错小贴士
 
 <CardGroup cols={2}>
   <Card title="连接失败">
